@@ -2,6 +2,10 @@
 
 The backend API for the LawnMate application - an open source lawn care management system for landscaping professionals from solo operators to small/medium teams.
 
+
+![App Login Screen](https://lawnbuddy.net/static/images/app-screenshot.png)
+![Website Landing Page](https://lawnbuddy.net/static/images/website-screenshot.png)
+
 ## Features
 
 * Customer Management
