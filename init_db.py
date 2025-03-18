@@ -14,8 +14,8 @@ with app.app_context():
     db.create_all()
     
     # Create default employee account
-    email = "daniel@eanix.net"
-    password = "securelogin"
+    email = "admin@example.com"
+    password = "admin"
     
     # Check if employee already exists
     existing_employee = Employee.query.filter_by(email=email).first()
