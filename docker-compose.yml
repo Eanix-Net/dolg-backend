@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "2000:5000"
+    env_file:
+      - .env
+    environment:
+      - FLASK_CORS_ALLOW_ORIGINS=*
+      - FLASK_CORS_SUPPORTS_CREDENTIALS=true
+      - FLASK_REFERRER_POLICY=unsafe-url
+      - FLASK_ALLOW_ALL_ORIGINS=true
+    volumes:
+      - .:/app
+    networks:
+      - lawnmate-network
+
+networks:
+  lawnmate-network:
+    driver: bridge 
