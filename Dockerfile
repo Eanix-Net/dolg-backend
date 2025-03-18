@@ -41,6 +41,3 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 
 # Set entrypoint
 ENTRYPOINT ["./entrypoint.sh"]
-
-# Command to run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:create_app()"]

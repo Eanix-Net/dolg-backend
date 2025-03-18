@@ -4,7 +4,7 @@ Gunicorn configuration to mitigate security vulnerabilities
 import multiprocessing
 
 # Bind to localhost only to prevent external access
-bind = "127.0.0.1:5000"
+bind = "0.0.0.0:5000"
 
 # Number of worker processes for handling requests
 workers = multiprocessing.cpu_count() * 2 + 1
