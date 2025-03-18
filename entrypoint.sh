@@ -16,6 +16,10 @@ echo "PostgreSQL is ready!"
 echo "Running database migrations..."
 flask db upgrade
 
-# Start the application
-echo "Starting application..."
-exec "$@" 
+# Start the application with secure configuration
+echo "Starting application with secure configuration..."
+if [ "$FLASK_ENV" = "development" ]; then
+    exec flask run --no-debugger --host=127.0.0.1 "$@"
+else
+    exec gunicorn --config gunicorn_config.py wsgi:app "$@" 
+fi 

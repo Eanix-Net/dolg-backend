@@ -28,15 +28,20 @@ load_dotenv()
 def create_app():
     app = Flask(__name__)
     
-    # Configure CORS - completely disabled
+    # Configure CORS - with security improvements
     CORS(app, 
         resources={r"/*": {"origins": "*"}},
         send_wildcard=True,
         allow_headers="*",
         expose_headers="*",
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        max_age=86400
+        max_age=86400,
+        allow_private_network=False,
+        supports_credentials=False
     )
+    
+    # Disable debug mode for Werkzeug
+    app.debug = False
     
     DB_USER = os.getenv('POSTGRES_USER')
     DB_PASSWORD = os.getenv('POSTGRES_PASSWORD')
@@ -66,6 +71,8 @@ def create_app():
         response.headers.add('Access-Control-Allow-Credentials', 'true')
         # Set Referrer-Policy to a permissive value instead of strict-origin-when-cross-origin
         response.headers.add('Referrer-Policy', 'unsafe-url')
+        # Add Vary: Cookie header to prevent session cookie disclosure
+        response.headers.add('Vary', 'Cookie')
         return response
     
     # Health check endpoint
