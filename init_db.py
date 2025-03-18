@@ -21,7 +21,7 @@ with app.app_context():
     existing_employee = Employee.query.filter_by(email=email).first()
     if not existing_employee:
         employee = Employee(
-            name="Daniel",
+            name="admin",
             email=email,
             password_hash=generate_password_hash(password),
             role="admin"
@@ -33,8 +33,8 @@ with app.app_context():
         print("Updating employee account...")
         existing_employee.password_hash = generate_password_hash(password)  
         existing_employee.role = "admin"
-        existing_employee.name = "Daniel"
-        existing_employee.email = "daniel@eanix.net"
+        existing_employee.name = "admin"
+        existing_employee.email = "admin@example.com"
         db.session.add(existing_employee)
         db.session.commit()
         print(f"Updated employee account for {email}")
