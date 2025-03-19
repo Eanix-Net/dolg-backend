@@ -1,10 +1,7 @@
-# LawnMate Backend
+# Dolg.io Backend
 
-The backend API for the LawnMate application - an open source lawn care management system for landscaping professionals from solo operators to small/medium teams.
+The backend API for the Dolg application - an open source lawn care management system for service professionals from solo operators to small/medium teams.
 
-
-![App Login Screen](https://lawnbuddy.net/static/images/app-screenshot.png)
-![Website Landing Page](https://lawnbuddy.net/static/images/website-screenshot.png)
 
 ## Features
 
@@ -42,11 +39,11 @@ Create a `.env` file in the backend directory with the following variables:
 FLASK_APP=app.py
 FLASK_ENV=development
 JWT_SECRET_KEY=your_secret_key_here
-POSTGRES_USER=lawnmate
+POSTGRES_USER=dolg
 POSTGRES_PASSWORD=your_password_here
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
-POSTGRES_DB=lawnmate
+POSTGRES_DB=dolg
 ```
 
 ## Installation
