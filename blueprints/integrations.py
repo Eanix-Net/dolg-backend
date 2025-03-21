@@ -2,6 +2,11 @@
 from flask import Blueprint, request, jsonify
 from blueprints.auth import admin_required, api_key_required
 import json
+from flasgger import swag_from
+from utils.swagger_docs import (
+    INTEGRATIONS_REGISTER_WEBHOOK_POST,
+    INTEGRATIONS_WEBHOOK_POST,
+    INTEGRATIONS_TEST_EVENT_GET)
 
 integrations_bp = Blueprint('integrations', __name__)
 
@@ -10,6 +15,7 @@ integrations_bp = Blueprint('integrations', __name__)
 
 # Endpoint to register a webhook (stub implementation)
 @integrations_bp.route('/register_webhook', methods=['POST'])
+@swag_from(INTEGRATIONS_REGISTER_WEBHOOK_POST)
 @admin_required
 def register_webhook():
     data = request.get_json() or {}
@@ -21,6 +27,7 @@ def register_webhook():
 
 # Endpoint to receive a webhook event (from external systems)
 @integrations_bp.route('/webhook', methods=['POST'])
+@swag_from(INTEGRATIONS_WEBHOOK_POST)
 @api_key_required
 def receive_webhook():
     data = request.get_json() or {}
@@ -31,6 +38,7 @@ def receive_webhook():
 
 # Test endpoint to simulate sending an integration event from your system
 @integrations_bp.route('/test_event', methods=['GET'])
+@swag_from(INTEGRATIONS_TEST_EVENT_GET)
 @api_key_required
 def test_event():
     # In a real system, you might trigger a webhook call here.

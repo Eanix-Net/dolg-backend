@@ -22,6 +22,7 @@ from flask import jsonify
 import os
 from dotenv import load_dotenv
 import sys 
+from flasgger import Swagger
 
 # Load environment variables from .env file
 load_dotenv()
@@ -53,15 +54,81 @@ def create_app():
     # Configuration from environment variables
     app.config['SQLALCHEMY_DATABASE_URI'] = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
-    app.config['JWT_TOKEN_LOCATION'] = ['headers']
+    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', "vpkhHIuKR7IvvZIZ23EqJYYyW5aR0wKgPg8zTdeJkqnVhbk7XCp/fRut")
+    app.config['JWT_TOKEN_LOCATION'] = ['headers', 'cookies']
     app.config['JWT_HEADER_NAME'] = 'Authorization'
     app.config['JWT_HEADER_TYPE'] = 'Bearer'
+    app.config['JWT_REFRESH_COOKIE_PATH'] = '/api/auth/refresh'
+    app.config['JWT_COOKIE_SECURE'] = True
+
+    print(app.config['JWT_SECRET_KEY'])
+    
+    # Configure Swagger
+    swagger_config = {
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": "apispec",
+                "route": "/api/apispec.json",
+                "rule_filter": lambda rule: True,  # all in
+                "model_filter": lambda tag: True,  # all in
+            }
+        ],
+        "static_url_path": "/api/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/api/docs"
+    }
+
+    swagger_template = {
+        "swagger": "2.0",
+        "info": {
+            "title": "Field Service Management API",
+            "description": "API Documentation for Field Service Management System",
+            "version": "1.0.0",
+            "contact": {
+                "email": "admin@example.com"
+            }
+        },
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT Authorization header using the Bearer scheme. Example: 'Bearer {token}'"
+            }
+        },
+        "security": [
+            {
+                "Bearer": []
+            }
+        ]
+    }
     
     # Initialize extensions
     db.init_app(app)
     migrate = Migrate(app, db)
-    JWTManager(app)
+    jwt = JWTManager(app)
+    
+    # Initialize Swagger after all blueprints are registered
+    # Register Blueprints
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(employees_bp, url_prefix='/api/employees')
+    app.register_blueprint(customers_bp, url_prefix='/api/customers')
+    app.register_blueprint(locations_bp, url_prefix='/api/locations')
+    app.register_blueprint(appointments_bp, url_prefix='/api/appointments')
+    app.register_blueprint(invoices_bp, url_prefix='/api/invoices')
+    app.register_blueprint(quotes_bp, url_prefix='/api/quotes')
+    app.register_blueprint(equipment_bp, url_prefix='/api/equipment')
+    app.register_blueprint(reviews_bp, url_prefix='/api/reviews')
+    app.register_blueprint(photos_bp, url_prefix='/api/photos')
+    app.register_blueprint(timelogs_bp, url_prefix='/api/timelogs')
+    app.register_blueprint(customer_portal_bp, url_prefix='/api/customer_portal')
+    app.register_blueprint(integrations_bp, url_prefix='/api/integrations')
+    app.register_blueprint(payments_bp, url_prefix='/api/payments')
+    #app.register_blueprint(docs_bp, url_prefix='/api/docs')
+    
+    # Initialize Swagger after all blueprints have been registered
+    swg = Swagger(app, config=swagger_config, template=swagger_template)
     
     # CORS preflight options for all routes
     @app.after_request
@@ -79,23 +146,20 @@ def create_app():
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])
     def health_check():
+        """
+        Health Check Endpoint
+        ---
+        responses:
+          200:
+            description: Server is healthy
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: healthy
+        """
         return jsonify({"status": "healthy"}), 200
-    
-    # Register Blueprints
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(employees_bp, url_prefix='/api/employees')
-    app.register_blueprint(customers_bp, url_prefix='/api/customers')
-    app.register_blueprint(locations_bp, url_prefix='/api/locations')
-    app.register_blueprint(appointments_bp, url_prefix='/api/appointments')
-    app.register_blueprint(invoices_bp, url_prefix='/api/invoices')
-    app.register_blueprint(quotes_bp, url_prefix='/api/quotes')
-    app.register_blueprint(equipment_bp, url_prefix='/api/equipment')
-    app.register_blueprint(reviews_bp, url_prefix='/api/reviews')
-    app.register_blueprint(photos_bp, url_prefix='/api/photos')
-    app.register_blueprint(timelogs_bp, url_prefix='/api/timelogs')
-    app.register_blueprint(customer_portal_bp, url_prefix='/api/customer_portal')
-    app.register_blueprint(integrations_bp, url_prefix='/api/integrations')
-    app.register_blueprint(payments_bp, url_prefix='/api/payments')
     
     # Create database tables (for development; use migrations in production)
     with app.app_context():

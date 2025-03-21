@@ -1,8 +1,18 @@
 # blueprints/quotes.py
 from flask import Blueprint, request, jsonify
 from blueprints.auth import employee_required, admin_required, lead_required
-from models import db, Quote, QuoteItem, Appointment, Employee
-from datetime import datetime
+from models import db, Quote, QuoteItem, Appointment, Employee, Customer, CustomerLocation
+from datetime import datetime, timedelta
+from flasgger import swag_from
+from utils.swagger_docs import (
+    QUOTES_GET,
+    QUOTES_POST,
+    QUOTES_QUOTE_ID_GET,
+    QUOTES_QUOTE_ID_PUT,
+    QUOTES_QUOTE_ID_DELETE,
+    QUOTES_QUOTE_ID_POST,
+    QUOTES_ITEM_ID_PUT,
+    QUOTES_ITEM_ID_DELETE)
 
 quotes_bp = Blueprint('quotes', __name__)
 
@@ -25,39 +35,56 @@ def quote_item_to_dict(qs):
 
 # Quote Endpoints
 @quotes_bp.route('/', methods=['GET'])
+@swag_from(QUOTES_GET)
 @employee_required
 def get_quotes():
     quotes = Quote.query.all()
     return jsonify([quote_to_dict(q) for q in quotes]), 200
 
 @quotes_bp.route('/', methods=['POST'])
+@swag_from(QUOTES_POST)
 @lead_required
 def create_quote():
     data = request.get_json() or {}
     try:
+        # Validate required fields
+        if not data.get('appointment_id'):
+            return jsonify({'msg': 'Appointment ID is required'}), 400
+        if not data.get('employee_id'):
+            return jsonify({'msg': 'Employee ID is required'}), 400
+            
         # Verify appointment exists
-        appointment = Appointment.query.get_or_404(data.get('appointment_id'))
+        appointment = Appointment.query.get(data.get('appointment_id'))
+        if not appointment:
+            return jsonify({'msg': 'Appointment not found'}), 400
+            
         # Verify employee exists
-        employee = Employee.query.get_or_404(data.get('employee_id'))
+        employee = Employee.query.get(data.get('employee_id'))
+        if not employee:
+            return jsonify({'msg': 'Employee not found'}), 400
         
+        # Create the quote
         new_quote = Quote(
             appointment_id=data.get('appointment_id'),
-            estimate=data.get('estimate'),
-            employee_id=data.get('employee_id')
+            employee_id=data.get('employee_id'),
+            estimate=data.get('estimate', 0)
         )
         db.session.add(new_quote)
         db.session.commit()
         return jsonify(quote_to_dict(new_quote)), 201
     except Exception as e:
+        db.session.rollback()
         return jsonify({'msg': str(e)}), 400
 
 @quotes_bp.route('/<int:quote_id>', methods=['GET'])
+@swag_from(QUOTES_QUOTE_ID_GET)
 @employee_required
 def get_quote(quote_id):
     quote = Quote.query.get_or_404(quote_id)
     return jsonify(quote_to_dict(quote)), 200
 
 @quotes_bp.route('/<int:quote_id>', methods=['PUT'])
+@swag_from(QUOTES_QUOTE_ID_PUT)
 @lead_required
 def update_quote(quote_id):
     quote = Quote.query.get_or_404(quote_id)
@@ -70,6 +97,7 @@ def update_quote(quote_id):
         return jsonify({'msg': str(e)}), 400
 
 @quotes_bp.route('/<int:quote_id>', methods=['DELETE'])
+@swag_from(QUOTES_QUOTE_ID_DELETE)
 @admin_required
 def delete_quote(quote_id):
     quote = Quote.query.get_or_404(quote_id)
@@ -79,12 +107,14 @@ def delete_quote(quote_id):
 
 # Quote Items Endpoints
 @quotes_bp.route('/<int:quote_id>/items', methods=['GET'])
+@swag_from(QUOTES_QUOTE_ID_GET)
 @employee_required
 def get_quote_items(quote_id):
     quote = Quote.query.get_or_404(quote_id)
     return jsonify([quote_item_to_dict(item) for item in quote.items]), 200
 
 @quotes_bp.route('/<int:quote_id>/services', methods=['POST'])
+@swag_from(QUOTES_QUOTE_ID_POST)
 @lead_required
 def create_quote_service(quote_id):
     quote = Quote.query.get_or_404(quote_id)
@@ -102,6 +132,7 @@ def create_quote_service(quote_id):
         return jsonify({'msg': str(e)}), 400
 
 @quotes_bp.route('/items/<int:item_id>', methods=['PUT'])
+@swag_from(QUOTES_ITEM_ID_PUT)
 @lead_required
 def update_quote_item(item_id):
     item = QuoteItem.query.get_or_404(item_id)
@@ -114,6 +145,7 @@ def update_quote_item(item_id):
         return jsonify({'msg': str(e)}), 400
 
 @quotes_bp.route('/item/<int:item_id>', methods=['DELETE'])
+@swag_from(QUOTES_ITEM_ID_DELETE)
 @admin_required
 def delete_quote_service(item_id):
     item = QuoteItem.query.get_or_404(item_id)

@@ -3,6 +3,17 @@ from flask import Blueprint, request, jsonify
 from blueprints.auth import employee_required, lead_required, admin_required
 from models import db, Invoice, InvoiceItem, Appointment, CustomerLocation, Customer, Service
 from datetime import datetime, date, timedelta
+from flasgger import swag_from
+from utils.swagger_docs import (
+    INVOICES_GET,
+    INVOICES_POST,
+    INVOICES_INVOICE_ID_GET,
+    INVOICES_INVOICE_ID_PUT,
+    INVOICES_INVOICE_ID_DELETE,
+    INVOICES_INVOICE_ID_POST,
+    INVOICES_ITEM_ID_PUT,
+    INVOICES_ITEM_ID_DELETE
+)
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -29,6 +40,7 @@ def invoice_item_to_dict(item):
 
 # Invoice Endpoints
 @invoices_bp.route('/', methods=['GET'])
+@swag_from(INVOICES_GET)
 @employee_required
 def get_invoices():
     customer_id = request.args.get('customer_id', type=int)
@@ -42,6 +54,7 @@ def get_invoices():
     return jsonify([invoice_to_dict(inv) for inv in invoices]), 200
 
 @invoices_bp.route('/', methods=['POST'])
+@swag_from(INVOICES_POST)
 @lead_required
 def create_invoice():
     data = request.get_json() or {}
@@ -65,12 +78,14 @@ def create_invoice():
         return jsonify({'msg': str(e)}), 400
 
 @invoices_bp.route('/<int:invoice_id>', methods=['GET'])
+@swag_from(INVOICES_INVOICE_ID_GET)
 @employee_required
 def get_invoice(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)
     return jsonify(invoice_to_dict(invoice)), 200
 
 @invoices_bp.route('/<int:invoice_id>', methods=['PUT'])
+@swag_from(INVOICES_INVOICE_ID_PUT)
 @lead_required
 def update_invoice(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)
@@ -89,6 +104,7 @@ def update_invoice(invoice_id):
         return jsonify({'msg': str(e)}), 400
 
 @invoices_bp.route('/<int:invoice_id>', methods=['DELETE'])
+@swag_from(INVOICES_INVOICE_ID_DELETE)
 @admin_required
 def delete_invoice(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)
@@ -98,12 +114,14 @@ def delete_invoice(invoice_id):
 
 # Invoice Items Endpoints
 @invoices_bp.route('/<int:invoice_id>/items', methods=['GET'])
+@swag_from(INVOICES_INVOICE_ID_GET)
 @lead_required
 def get_invoice_items(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)
     return jsonify([invoice_item_to_dict(item) for item in invoice.items]), 200
 
 @invoices_bp.route('/<int:invoice_id>/items', methods=['POST'])
+@swag_from(INVOICES_INVOICE_ID_POST)
 @lead_required
 def create_invoice_item(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)
@@ -121,6 +139,7 @@ def create_invoice_item(invoice_id):
         return jsonify({'msg': str(e)}), 400
 
 @invoices_bp.route('/items/<int:item_id>', methods=['PUT'])
+@swag_from(INVOICES_ITEM_ID_PUT)
 @lead_required
 def update_invoice_item(item_id):
     item = InvoiceItem.query.get_or_404(item_id)
@@ -133,6 +152,7 @@ def update_invoice_item(item_id):
         return jsonify({'msg': str(e)}), 400
 
 @invoices_bp.route('/items/<int:item_id>', methods=['DELETE'])
+@swag_from(INVOICES_ITEM_ID_DELETE)
 @admin_required
 def delete_invoice_item(item_id):
     item = InvoiceItem.query.get_or_404(item_id)
@@ -142,6 +162,7 @@ def delete_invoice_item(item_id):
 
 # Add endpoint to generate invoice from appointment
 @invoices_bp.route('/from-appointment/<int:appointment_id>', methods=['POST'])
+@swag_from(INVOICES_POST)
 @lead_required
 def generate_invoice_from_appointment(appointment_id):
     try:
@@ -217,6 +238,7 @@ def generate_invoice_from_appointment(appointment_id):
 
 # Add endpoint to get payments for an invoice
 @invoices_bp.route('/<int:invoice_id>/payments', methods=['GET'])
+@swag_from(INVOICES_INVOICE_ID_GET)
 @employee_required
 def get_invoice_payments(invoice_id):
     invoice = Invoice.query.get_or_404(invoice_id)

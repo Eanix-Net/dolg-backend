@@ -3,6 +3,13 @@ from flask import Blueprint, request, jsonify
 from blueprints.auth import employee_required, lead_required, admin_required
 from models import db, Invoice, Payment
 from datetime import datetime
+from flasgger import swag_from
+from utils.swagger_docs import (
+    PAYMENTS_POST,
+    PAYMENTS_PAYMENT_ID_GET,
+    PAYMENTS_INVOICE_ID_GET,
+    PAYMENTS_PAYMENT_ID_PUT,
+    PAYMENTS_PAYMENT_ID_DELETE)
 
 payments_bp = Blueprint('payments', __name__)
 
@@ -20,6 +27,7 @@ def payment_to_dict(payment):
     }
 
 @payments_bp.route('/', methods=['POST'])
+@swag_from(PAYMENTS_POST)
 @lead_required
 def create_payment():
     data = request.get_json() or {}
@@ -34,7 +42,7 @@ def create_payment():
             payment_method=data.get('payment_method'),
             reference_number=data.get('reference_number'),
             notes=data.get('notes'),
-            created_at=datetime.utcnow()
+            created_at=datetime.now(datetime.UTC)
         )
         
         # Update invoice paid amount
@@ -55,12 +63,14 @@ def create_payment():
         return jsonify({'msg': str(e)}), 400
 
 @payments_bp.route('/<int:payment_id>', methods=['GET'])
+@swag_from(PAYMENTS_PAYMENT_ID_GET)
 @employee_required
 def get_payment(payment_id):
     payment = Payment.query.get_or_404(payment_id)
     return jsonify(payment_to_dict(payment)), 200
 
 @payments_bp.route('/invoice/<int:invoice_id>', methods=['GET'])
+@swag_from(PAYMENTS_INVOICE_ID_GET)
 @employee_required
 def get_payments_for_invoice(invoice_id):
     # Verify invoice exists
@@ -72,6 +82,7 @@ def get_payments_for_invoice(invoice_id):
     return jsonify([payment_to_dict(payment) for payment in payments]), 200
 
 @payments_bp.route('/<int:payment_id>', methods=['PUT'])
+@swag_from(PAYMENTS_PAYMENT_ID_PUT)
 @lead_required
 def update_payment(payment_id):
     payment = Payment.query.get_or_404(payment_id)
@@ -107,7 +118,7 @@ def update_payment(payment_id):
         if 'notes' in data:
             payment.notes = data.get('notes')
             
-        payment.updated_at = datetime.utcnow()
+        payment.updated_at = datetime.now(datetime.UTC)
         
         db.session.commit()
         return jsonify(payment_to_dict(payment)), 200
@@ -115,6 +126,7 @@ def update_payment(payment_id):
         return jsonify({'msg': str(e)}), 400
 
 @payments_bp.route('/<int:payment_id>', methods=['DELETE'])
+@swag_from(PAYMENTS_PAYMENT_ID_DELETE)
 @admin_required
 def delete_payment(payment_id):
     payment = Payment.query.get_or_404(payment_id)

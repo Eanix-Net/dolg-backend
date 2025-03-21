@@ -1,6 +1,7 @@
 # models.py
 from flask_sqlalchemy import SQLAlchemy
 import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
@@ -11,7 +12,7 @@ class Employee(db.Model):
     name = db.Column(db.String(128), nullable=False)
     phone = db.Column(db.String(20))
     email = db.Column(db.String(128), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
     team = db.Column(db.String(128))
     role = db.Column(db.String(64))  # e.g., 'admin', 'lead', 'employee'
     
@@ -31,7 +32,7 @@ class Customer(db.Model):
     email = db.Column(db.String(128), unique=True, nullable=False) 
     password_hash = db.Column(db.String(128))  # For future customer login support   
     notes = db.Column(db.Text) 
-    created_datetime = db.Column(db.DateTime, default=datetime.datetime.utcnow)   
+    created_datetime = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))   
     locations = db.relationship('CustomerLocation', backref='customer', lazy=True)
 
 class CustomerLocation(db.Model):  
@@ -42,7 +43,12 @@ class CustomerLocation(db.Model):
     point_of_contact = db.Column(db.String(128)) 
     property_type = db.Column(db.String(64))  # Business or Residential 
     approx_acres = db.Column(db.Float)  
+    city = db.Column(db.String(128))
+    state = db.Column(db.String(64))
+    zip_code = db.Column(db.String(20))
     notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
+    updated_at = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.UTC))
 
 # ---------- Unlimited Services (self-hosted) ----------
 class Service(db.Model): 
@@ -57,11 +63,44 @@ class Service(db.Model):
 class Appointment(db.Model):  
     __tablename__ = 'appointments' 
     id = db.Column(db.Integer, primary_key=True)
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
+    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'))
     customer_location_id = db.Column(db.Integer, db.ForeignKey('customer_locations.id'), nullable=False)
+    location_id = db.Column(db.Integer, db.ForeignKey('customer_locations.id'))  # Alias for customer_location_id
+    description = db.Column(db.String(256))
     arrival_datetime = db.Column(db.DateTime, nullable=False)
     departure_datetime = db.Column(db.DateTime, nullable=False)
+    start_time = db.Column(db.DateTime)  # Alias for arrival_datetime
+    end_time = db.Column(db.DateTime)  # Alias for departure_datetime
+    status = db.Column(db.String(64), default='scheduled')
     team = db.Column(db.String(128))
-    location = db.relationship('CustomerLocation', backref='appointments')
+    notes = db.Column(db.Text)
+    created_datetime = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
+    location = db.relationship('CustomerLocation', foreign_keys=[customer_location_id], backref='appointments')
+    
+    @property
+    def start_time(self):
+        return self.arrival_datetime
+    
+    @start_time.setter
+    def start_time(self, value):
+        self.arrival_datetime = value
+    
+    @property
+    def end_time(self):
+        return self.departure_datetime
+    
+    @end_time.setter
+    def end_time(self, value):
+        self.departure_datetime = value
+    
+    @property
+    def location_id(self):
+        return self.customer_location_id
+    
+    @location_id.setter
+    def location_id(self, value):
+        self.customer_location_id = value
 
 class RecurringAppointment(db.Model):
     __tablename__ = 'recurring_appointments'
@@ -83,17 +122,16 @@ class Invoice(db.Model):
     paid = db.Column(db.String(16), nullable=False, default='unpaid')  # Options: 'paid', 'unpaid', 'declined'
     attempt = db.Column(db.Integer, nullable=False, default=1)
     due_date = db.Column(db.Date, nullable=False)
-    created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    created_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
     items = db.relationship('InvoiceItem', backref='invoice', lazy=True)
-    # Add fields needed for frontend functionality
     amount_paid = db.Column(db.Float, default=0.0)
     balance = db.Column(db.Float, default=0.0)
     status = db.Column(db.String(32), default='draft')  # 'draft', 'sent', 'paid', 'overdue', 'canceled'
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
-    customer_name = db.Column(db.String(128))
     invoice_number = db.Column(db.String(64), unique=True)
     notes = db.Column(db.Text)
+    appointment = db.relationship('Appointment', backref='invoice', lazy=True)
     payments = db.relationship('Payment', backref='invoice', lazy=True)
+
 
 class InvoiceItem(db.Model):
     __tablename__ = 'invoice_items'
@@ -108,7 +146,11 @@ class Quote(db.Model):
     appointment_id = db.Column(db.Integer, db.ForeignKey('appointments.id'), nullable=False)
     estimate = db.Column(db.Float, nullable=False)
     employee_id = db.Column(db.Integer, db.ForeignKey('employees.id'), nullable=False)
-    created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    notes = db.Column(db.Text)
+    service_description = db.Column(db.String(256))
+    valid_until = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
+    created_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
+    employee = db.relationship('Employee', backref='quotes', lazy=True)
     items = db.relationship('QuoteItem', backref='quote', lazy=True)
 
 class QuoteItem(db.Model):
@@ -137,13 +179,25 @@ class Equipment(db.Model):
     equipment_category_id = db.Column(db.Integer, db.ForeignKey('equipment_categories.id'))
     purchase_price = db.Column(db.Float)
     repair_cost_to_date = db.Column(db.Float, default=0.0)
-    purchased_by = db.Column(db.String(128))
-    fuel_type = db.Column(db.String(32))  # e.g., Gas, Diesel, Electric
-    oil_type = db.Column(db.String(32))   # or None
-    created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    purchased_by = db.Column(db.Integer, db.ForeignKey('employees.id'))
+    created_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
+    purchaser = db.relationship('Employee', backref='equipment', lazy=True)
     category = db.relationship('EquipmentCategory', backref='equipment', lazy=True)
     assignments = db.relationship('EquipmentAssignment', backref='equipment', lazy=True)
     consumables = db.relationship('ConsumableUsage', backref='equipment', lazy=True)
+
+class Consumable(db.Model):
+    __tablename__ = 'consumables'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    manufacturer = db.Column(db.String(128))
+    model = db.Column(db.String(128))
+    cost_per_unit = db.Column(db.Float, nullable=False)
+    unit_of_measure = db.Column(db.String(32), nullable=False)
+    purchased_by = db.Column(db.Integer, db.ForeignKey('employees.id'))
+    purchased_date = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
+    purchaser = db.relationship('Employee', backref='consumables', lazy=True)
+    
 
 class EquipmentAssignment(db.Model):
     __tablename__ = 'equipment_assignments'
@@ -170,7 +224,7 @@ class Review(db.Model):
     appointment_id = db.Column(db.Integer, db.ForeignKey('appointments.id'), nullable=True)
     rating = db.Column(db.Integer, nullable=False)
     comment = db.Column(db.Text)
-    datetime = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    datetime = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
 
 # Before/After Photos
 class Photo(db.Model):
@@ -182,7 +236,7 @@ class Photo(db.Model):
     approved_by = db.Column(db.String(128))
     show_to_customer = db.Column(db.Boolean, default=False)
     show_on_website = db.Column(db.Boolean, default=False)
-    datetime = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    datetime = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
 
 # Job Time Tracking
 class TimeLog(db.Model):
@@ -205,5 +259,5 @@ class Payment(db.Model):
     status = db.Column(db.String(32), default='completed')  # 'pending', 'completed', 'failed', 'refunded'
     reference_number = db.Column(db.String(64))
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    updated_at = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.now(datetime.UTC))
+    updated_at = db.Column(db.DateTime, onupdate=datetime.datetime.now(datetime.UTC))

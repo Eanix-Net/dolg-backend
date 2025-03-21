@@ -1,11 +1,25 @@
 # blueprints/customer_portal.py
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import (
-    create_access_token, jwt_required, get_jwt_identity, get_jwt
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+    get_jwt
 )
+from flasgger import swag_from
+from utils.swagger_docs import (
+    CUSTOMER_PORTAL_REGISTER_POST,
+    CUSTOMER_PORTAL_LOGIN_POST,
+    CUSTOMER_PORTAL_PROFILE_GET,
+    CUSTOMER_PORTAL_PROFILE_PUT,
+    CUSTOMER_PORTAL_APPOINTMENTS_GET,
+    CUSTOMER_PORTAL_INVOICES_GET,
+    CUSTOMER_PORTAL_PHOTOS_GET,
+    CUSTOMER_PORTAL_REVIEWS_POST,
+    CUSTOMER_PORTAL_INVOICE_ID_GET)
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, Customer, CustomerLocation, Appointment, Invoice, Photo, Review
-from datetime import timedelta
+from datetime import timedelta, datetime
 import re
 
 customer_portal_bp = Blueprint('customer_portal', __name__)
@@ -28,6 +42,7 @@ def is_valid_email(email):
 # ------------------------------------------
 # Customer Registration (Separate from Employees)
 # ------------------------------------------
+@swag_from(CUSTOMER_PORTAL_REGISTER_POST)
 @customer_portal_bp.route('/register', methods=['POST'])
 def customer_register():
     data = request.get_json() or {}
@@ -54,10 +69,14 @@ def customer_register():
         )
         db.session.add(new_customer)
         db.session.commit()
-        return jsonify({'msg': 'Customer registered successfully'}), 201
+        return jsonify({
+            'msg': 'Customer registered successfully',
+            'customer_id': new_customer.id
+        }), 201
     except Exception as e:
         return jsonify({'msg': str(e)}), 400
 
+@swag_from(CUSTOMER_PORTAL_LOGIN_POST)
 @customer_portal_bp.route('/login', methods=['POST'])
 def customer_login():
     data = request.get_json() or {}
@@ -69,19 +88,26 @@ def customer_login():
 
     customer = Customer.query.filter_by(email=email).first()
     if not customer or not check_password_hash(customer.password_hash, password):
-        return jsonify({'msg': 'Bad email or password'}), 401
+        return jsonify({'msg': 'Invalid email or password'}), 401
 
     # Add a claim to distinguish customer tokens from employee tokens
     additional_claims = {"user_type": "customer"}
     access_token = create_access_token(
-        identity=customer.id,
+        identity=str(customer.id),
         additional_claims=additional_claims,
         expires_delta=timedelta(hours=12)
     )
-    return jsonify({'access_token': access_token}), 200
+    return jsonify({
+        'access_token': access_token,
+        'customer': {
+            'id': customer.id,
+            'name': customer.name,
+            'email': customer.email
+        }
+    }), 200
 
 def customer_required(fn):
-    @jwt_required
+    @jwt_required()
     def wrapper(*args, **kwargs):
         claims = get_jwt()
         if claims.get("user_type") != "customer":
@@ -91,16 +117,24 @@ def customer_required(fn):
     return wrapper
 
 @customer_portal_bp.route('/profile', methods=['GET'])
+@swag_from(CUSTOMER_PORTAL_PROFILE_GET)
 @customer_required
 def get_customer_profile():
     customer_id = get_jwt_identity()
+    # Convert to int if it's a string
+    if isinstance(customer_id, str):
+        customer_id = int(customer_id)
     customer = Customer.query.get_or_404(customer_id)
     return jsonify(customer_to_dict(customer)), 200
 
 @customer_portal_bp.route('/profile', methods=['PUT'])
+@swag_from(CUSTOMER_PORTAL_PROFILE_PUT)
 @customer_required
 def update_customer_profile():
     customer_id = get_jwt_identity()
+    # Convert to int if it's a string
+    if isinstance(customer_id, str):
+        customer_id = int(customer_id)
     customer = Customer.query.get_or_404(customer_id)
     data = request.get_json() or {}
     try:
@@ -114,9 +148,13 @@ def update_customer_profile():
         return jsonify({'msg': str(e)}), 400
 
 @customer_portal_bp.route('/appointments', methods=['GET'])
+@swag_from(CUSTOMER_PORTAL_APPOINTMENTS_GET)
 @customer_required
 def get_customer_appointments():
     customer_id = get_jwt_identity()
+    # Convert to int if it's a string
+    if isinstance(customer_id, str):
+        customer_id = int(customer_id)
     customer = Customer.query.get_or_404(customer_id)
     appointments = []
     for location in customer.locations:
@@ -130,9 +168,13 @@ def get_customer_appointments():
     } for apt in appointments]), 200
 
 @customer_portal_bp.route('/invoices', methods=['GET'])
+@swag_from(CUSTOMER_PORTAL_INVOICES_GET)
 @customer_required
 def get_customer_invoices():
     customer_id = get_jwt_identity()
+    # Convert to int if it's a string
+    if isinstance(customer_id, str):
+        customer_id = int(customer_id)
     customer = Customer.query.get_or_404(customer_id)
     invoices = []
     for location in customer.locations:
@@ -150,9 +192,13 @@ def get_customer_invoices():
     } for inv in invoices]), 200
 
 @customer_portal_bp.route('/photos', methods=['GET'])
+@swag_from(CUSTOMER_PORTAL_PHOTOS_GET)
 @customer_required
 def get_customer_photos():
     customer_id = get_jwt_identity()
+    # Convert to int if it's a string
+    if isinstance(customer_id, str):
+        customer_id = int(customer_id)
     customer = Customer.query.get_or_404(customer_id)
     photos = []
     for location in customer.locations:
@@ -166,9 +212,13 @@ def get_customer_photos():
     } for photo in photos if photo.show_to_customer]), 200
 
 @customer_portal_bp.route('/reviews', methods=['POST'])
+@swag_from(CUSTOMER_PORTAL_REVIEWS_POST)
 @customer_required
 def submit_review():
     customer_id = get_jwt_identity()
+    # Convert to int if it's a string
+    if isinstance(customer_id, str):
+        customer_id = int(customer_id)
     customer = Customer.query.get_or_404(customer_id)
     data = request.get_json() or {}
     try:
@@ -178,7 +228,7 @@ def submit_review():
             appointment_id=data.get('appointment_id'),
             rating=data.get('rating'),
             comment=data.get('comment'),
-            datetime=datetime.utcnow()
+            datetime=datetime.now(datetime.UTC)
         )
         db.session.add(new_review)
         db.session.commit()
@@ -187,6 +237,7 @@ def submit_review():
         return jsonify({'msg': str(e)}), 400
 
 @customer_portal_bp.route('/payment/<int:invoice_id>', methods=['GET'])
+@swag_from(CUSTOMER_PORTAL_INVOICE_ID_GET)
 @customer_required
 def initiate_payment(invoice_id):
     # In a real integration, call the payment provider (e.g., Stripe) to create a payment session.

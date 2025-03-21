@@ -3,6 +3,16 @@ from flask import Blueprint, request, jsonify
 from blueprints.auth import employee_required, admin_required
 from models import db, EquipmentCategory, Equipment, EquipmentAssignment, ConsumableUsage
 from datetime import datetime, date
+from flasgger import swag_from
+from utils.swagger_docs import (
+    EQUIPMENT_CATEGORIES_GET,
+    EQUIPMENT_CATEGORIES_POST,
+    EQUIPMENT_GET,
+    EQUIPMENT_POST,
+    EQUIPMENT_EQ_ID_GET,
+    EQUIPMENT_EQ_ID_PUT,
+    EQUIPMENT_EQ_ID_DELETE,
+    EQUIPMENT_EQ_ID_POST)
 
 equipment_bp = Blueprint('equipment', __name__)
 
@@ -14,12 +24,14 @@ def category_to_dict(cat):
     }
 
 @equipment_bp.route('/categories', methods=['GET'])
+@swag_from(EQUIPMENT_CATEGORIES_GET)
 @employee_required
 def get_categories():
     categories = EquipmentCategory.query.all()
     return jsonify([category_to_dict(cat) for cat in categories]), 200
 
 @equipment_bp.route('/categories', methods=['POST'])
+@swag_from(EQUIPMENT_CATEGORIES_POST)
 @admin_required
 def create_category():
     data = request.get_json() or {}
@@ -51,12 +63,14 @@ def equipment_to_dict(eq):
     }
 
 @equipment_bp.route('/', methods=['GET'])
+@swag_from(EQUIPMENT_GET)
 @employee_required
 def get_equipment():
     equipment = Equipment.query.all()
     return jsonify([equipment_to_dict(eq) for eq in equipment]), 200
 
 @equipment_bp.route('/', methods=['POST'])
+@swag_from(EQUIPMENT_POST)
 @admin_required
 def create_equipment():
     data = request.get_json() or {}
@@ -82,12 +96,14 @@ def create_equipment():
     return jsonify({'msg': 'Equipment created', 'equipment_id': new_eq.id}), 201
 
 @equipment_bp.route('/<int:eq_id>', methods=['GET'])
+@swag_from(EQUIPMENT_EQ_ID_GET)
 @employee_required
 def get_equipment_item(eq_id):
     eq = Equipment.query.get_or_404(eq_id)
     return jsonify(equipment_to_dict(eq)), 200
 
 @equipment_bp.route('/<int:eq_id>', methods=['PUT'])
+@swag_from(EQUIPMENT_EQ_ID_PUT)
 @admin_required
 def update_equipment(eq_id):
     eq = Equipment.query.get_or_404(eq_id)
@@ -98,6 +114,7 @@ def update_equipment(eq_id):
     return jsonify({'msg': 'Equipment updated'}), 200
 
 @equipment_bp.route('/<int:eq_id>', methods=['DELETE'])
+@swag_from(EQUIPMENT_EQ_ID_DELETE)
 @admin_required
 def delete_equipment(eq_id):
     eq = Equipment.query.get_or_404(eq_id)
@@ -115,12 +132,14 @@ def assignment_to_dict(assign):
     }
 
 @equipment_bp.route('/<int:eq_id>/assignments', methods=['GET'])
+@swag_from(EQUIPMENT_EQ_ID_GET)
 @employee_required
 def get_assignments(eq_id):
     eq = Equipment.query.get_or_404(eq_id)
     return jsonify([assignment_to_dict(a) for a in eq.assignments]), 200
 
 @equipment_bp.route('/<int:eq_id>/assignments', methods=['POST'])
+@swag_from(EQUIPMENT_EQ_ID_POST)
 @admin_required
 def create_assignment(eq_id):
     Equipment.query.get_or_404(eq_id)  # Ensure equipment exists
@@ -146,12 +165,14 @@ def consumable_to_dict(c):
     }
 
 @equipment_bp.route('/<int:eq_id>/consumables', methods=['GET'])
+@swag_from(EQUIPMENT_EQ_ID_GET)
 @employee_required
 def get_consumables(eq_id):
     eq = Equipment.query.get_or_404(eq_id)
     return jsonify([consumable_to_dict(c) for c in eq.consumables]), 200
 
 @equipment_bp.route('/<int:eq_id>/consumables', methods=['POST'])
+@swag_from(EQUIPMENT_EQ_ID_POST)
 @admin_required
 def create_consumable(eq_id):
     Equipment.query.get_or_404(eq_id)

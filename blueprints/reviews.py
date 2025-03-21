@@ -3,6 +3,12 @@ from flask import Blueprint, request, jsonify
 from blueprints.auth import employee_required, admin_required
 from models import db, Review
 from datetime import datetime
+from flasgger import swag_from
+from utils.swagger_docs import (
+    REVIEWS_GET,
+    REVIEWS_POST,
+    REVIEWS_REVIEW_ID_PUT,
+    REVIEWS_REVIEW_ID_DELETE)
 
 reviews_bp = Blueprint('reviews', __name__)
 
@@ -18,12 +24,14 @@ def review_to_dict(review):
     }
 
 @reviews_bp.route('/', methods=['GET'])
+@swag_from(REVIEWS_GET)
 @employee_required
 def get_reviews():
     reviews = Review.query.all()
     return jsonify([review_to_dict(r) for r in reviews]), 200
 
 @reviews_bp.route('/', methods=['POST'])
+@swag_from(REVIEWS_POST)
 @admin_required
 def create_review():
     data = request.get_json() or {}
@@ -34,7 +42,7 @@ def create_review():
             appointment_id=data.get('appointment_id'),
             rating=data.get('rating'),
             comment=data.get('comment'),
-            datetime=datetime.utcnow()
+            datetime=datetime.now(datetime.UTC)
         )
         db.session.add(new_review)
         db.session.commit()
@@ -43,6 +51,7 @@ def create_review():
         return jsonify({'msg': str(e)}), 400
 
 @reviews_bp.route('/<int:review_id>', methods=['PUT'])
+@swag_from(REVIEWS_REVIEW_ID_PUT)
 @admin_required
 def update_review(review_id):
     review = Review.query.get_or_404(review_id)
@@ -56,6 +65,7 @@ def update_review(review_id):
         return jsonify({'msg': str(e)}), 400
 
 @reviews_bp.route('/<int:review_id>', methods=['DELETE'])
+@swag_from(REVIEWS_REVIEW_ID_DELETE)
 @admin_required
 def delete_review(review_id):
     review = Review.query.get_or_404(review_id)

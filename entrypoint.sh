@@ -7,7 +7,7 @@ fi
 
 # Wait for PostgreSQL to be ready
 echo "Waiting for PostgreSQL..."
-while ! pg_isready -h ${DB_HOST:-192.168.2.7} -p ${DB_PORT:-5432} -U ${DB_USER:-lawnmate}; do
+while ! pg_isready -h ${DB_HOST:-192.168.2.7} -p ${DB_PORT:-5432} -U ${DB_USER:-dolg}; do
     sleep 1
 done
 echo "PostgreSQL is ready!"

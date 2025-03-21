@@ -3,6 +3,12 @@ from flask import Blueprint, request, jsonify
 from models import db, TimeLog
 from datetime import datetime
 from blueprints.auth import employee_required
+from flasgger import swag_from
+from utils.swagger_docs import (
+    TIMELOGS_GET,
+    TIMELOGS_POST,
+    TIMELOGS_LOG_ID_PUT,
+    TIMELOGS_LOG_ID_DELETE)
 
 timelogs_bp = Blueprint('timelogs', __name__)
 
@@ -17,12 +23,14 @@ def timelog_to_dict(tl):
     }
 
 @timelogs_bp.route('/', methods=['GET'])
+@swag_from(TIMELOGS_GET)
 @employee_required
 def get_timelogs():
     logs = TimeLog.query.all()
     return jsonify([timelog_to_dict(log) for log in logs]), 200
 
 @timelogs_bp.route('/', methods=['POST'])
+@swag_from(TIMELOGS_POST)
 @employee_required
 def create_timelog():
     data = request.get_json() or {}
@@ -39,6 +47,7 @@ def create_timelog():
         return jsonify({'msg': str(e)}), 400
 
 @timelogs_bp.route('/<int:log_id>', methods=['PUT'])
+@swag_from(TIMELOGS_LOG_ID_PUT)
 @employee_required
 def update_timelog(log_id):
     log = TimeLog.query.get_or_404(log_id)
@@ -55,6 +64,7 @@ def update_timelog(log_id):
         return jsonify({'msg': str(e)}), 400
 
 @timelogs_bp.route('/<int:log_id>', methods=['DELETE'])
+@swag_from(TIMELOGS_LOG_ID_DELETE)
 @employee_required
 def delete_timelog(log_id):
     log = TimeLog.query.get_or_404(log_id)
