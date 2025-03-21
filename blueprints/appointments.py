@@ -1,7 +1,7 @@
 # blueprints/appointments.py
 from flask import Blueprint, request, jsonify
 from blueprints.auth import employee_required, lead_required, admin_required
-from models import db, Appointment, RecurringAppointment, CustomerLocation
+from models import db, Appointment, RecurringAppointment, CustomerLocation, Customer
 from datetime import datetime, date
 
 appointments_bp = Blueprint('appointments', __name__)
@@ -33,8 +33,51 @@ def recurring_appointment_to_dict(recurring):
 @appointments_bp.route('/', methods=['GET'])
 @employee_required
 def get_appointments():
-    appointments = Appointment.query.all()
-    return jsonify([appointment_to_dict(app) for app in appointments]), 200
+    # Get date range filters from query parameters
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    
+    # Base query
+    query = Appointment.query
+    
+    # Apply date filters if provided
+    if start_date_str:
+        try:
+            start_date = datetime.fromisoformat(start_date_str)
+            query = query.filter(Appointment.arrival_datetime >= start_date)
+        except ValueError:
+            return jsonify({'msg': 'Invalid start_date format. Use ISO format (YYYY-MM-DD)'}), 400
+    
+    if end_date_str:
+        try:
+            end_date = datetime.fromisoformat(end_date_str)
+            # Add one day to include the entire end date
+            end_date = end_date.replace(hour=23, minute=59, second=59)
+            query = query.filter(Appointment.arrival_datetime <= end_date)
+        except ValueError:
+            return jsonify({'msg': 'Invalid end_date format. Use ISO format (YYYY-MM-DD)'}), 400
+    
+    # Fetch appointments with the applied filters
+    appointments = query.all()
+    
+    # Enhance appointment data with customer information
+    enhanced_appointments = []
+    for appointment in appointments:
+        appointment_dict = appointment_to_dict(appointment)
+        
+        # Get the customer location information
+        location = CustomerLocation.query.get(appointment.customer_location_id)
+        if location:
+            appointment_dict['address'] = location.address
+            
+            # Get the customer information
+            customer = Customer.query.get(location.customer_id)
+            if customer:
+                appointment_dict['customerName'] = customer.name
+                
+        enhanced_appointments.append(appointment_dict)
+    
+    return jsonify(enhanced_appointments), 200
 
 @appointments_bp.route('/', methods=['POST'])
 @lead_required

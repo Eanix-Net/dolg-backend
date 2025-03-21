@@ -1,8 +1,8 @@
 # blueprints/invoices.py
 from flask import Blueprint, request, jsonify
 from blueprints.auth import employee_required, lead_required, admin_required
-from models import db, Invoice, InvoiceItem, Appointment
-from datetime import datetime, date
+from models import db, Invoice, InvoiceItem, Appointment, CustomerLocation, Customer, Service
+from datetime import datetime, date, timedelta
 
 invoices_bp = Blueprint('invoices', __name__)
 
@@ -31,7 +31,14 @@ def invoice_item_to_dict(item):
 @invoices_bp.route('/', methods=['GET'])
 @employee_required
 def get_invoices():
-    invoices = Invoice.query.all()
+    customer_id = request.args.get('customer_id', type=int)
+    
+    # If customer_id is provided, filter by customer
+    if customer_id:
+        invoices = Invoice.query.filter_by(customer_id=customer_id).all()
+    else:
+        invoices = Invoice.query.all()
+        
     return jsonify([invoice_to_dict(inv) for inv in invoices]), 200
 
 @invoices_bp.route('/', methods=['POST'])
@@ -132,3 +139,104 @@ def delete_invoice_item(item_id):
     db.session.delete(item)
     db.session.commit()
     return jsonify({'msg': 'Invoice item deleted'}), 200
+
+# Add endpoint to generate invoice from appointment
+@invoices_bp.route('/from-appointment/<int:appointment_id>', methods=['POST'])
+@lead_required
+def generate_invoice_from_appointment(appointment_id):
+    try:
+        # Get the appointment
+        appointment = Appointment.query.get_or_404(appointment_id)
+        
+        # Get customer information from location
+        customer_location = CustomerLocation.query.get_or_404(appointment.customer_location_id)
+        customer = Customer.query.get_or_404(customer_location.customer_id)
+        
+        # Calculate invoice details
+        issue_date = datetime.now()
+        due_date = issue_date + timedelta(days=30)  # Due in 30 days
+        
+        # Generate a unique invoice number
+        invoice_count = Invoice.query.count()
+        invoice_number = f"INV-{issue_date.year}{issue_date.month:02d}-{invoice_count + 1:04d}"
+        
+        # Create the invoice
+        new_invoice = Invoice(
+            appointment_id=appointment_id,
+            customer_id=customer.id,
+            customer_name=customer.name,
+            invoice_number=invoice_number,
+            subtotal=0.0,  # Will be updated based on items
+            total=0.0,     # Will be updated based on items
+            tax_rate=0.0,  # Default, can be adjusted
+            paid='unpaid',
+            status='draft',
+            amount_paid=0.0,
+            balance=0.0,   # Will be updated based on total
+            due_date=due_date,
+            notes=f"Invoice for appointment on {appointment.arrival_datetime.strftime('%Y-%m-%d')}"
+        )
+        
+        db.session.add(new_invoice)
+        db.session.flush()  # Get the invoice ID without committing
+        
+        # Create a default invoice item for the lawn service
+        service = Service.query.filter_by(name='Lawn Service').first()
+        if not service:
+            # Create a default service if it doesn't exist
+            service = Service(name='Lawn Service', description='Regular lawn maintenance service')
+            db.session.add(service)
+            db.session.flush()
+        
+        # Calculate duration in hours (for pricing)
+        duration_hours = (appointment.departure_datetime - appointment.arrival_datetime).total_seconds() / 3600
+        
+        # Default price of $75 per service
+        item_cost = 75.0
+        
+        # Create the invoice item
+        item = InvoiceItem(
+            invoice_id=new_invoice.id,
+            service_id=service.id,
+            cost=item_cost
+        )
+        
+        db.session.add(item)
+        
+        # Update invoice totals
+        new_invoice.subtotal = item_cost
+        new_invoice.total = item_cost
+        new_invoice.balance = item_cost
+        
+        db.session.commit()
+        
+        return jsonify(invoice_to_dict(new_invoice)), 201
+        
+    except Exception as e:
+        return jsonify({'msg': str(e)}), 400
+
+# Add endpoint to get payments for an invoice
+@invoices_bp.route('/<int:invoice_id>/payments', methods=['GET'])
+@employee_required
+def get_invoice_payments(invoice_id):
+    invoice = Invoice.query.get_or_404(invoice_id)
+    
+    # Import the Payment model and get related payments
+    from models import Payment
+    payments = Payment.query.filter_by(invoice_id=invoice_id).all()
+    
+    # Define payment_to_dict function if not already defined
+    def payment_to_dict(payment):
+        return {
+            'id': payment.id,
+            'invoice_id': payment.invoice_id,
+            'amount': payment.amount,
+            'payment_date': payment.payment_date.isoformat(),
+            'payment_method': payment.payment_method,
+            'reference_number': payment.reference_number,
+            'notes': payment.notes,
+            'created_at': payment.created_at.isoformat() if payment.created_at else None,
+            'updated_at': payment.updated_at.isoformat() if payment.updated_at else None
+        }
+    
+    return jsonify([payment_to_dict(payment) for payment in payments]), 200

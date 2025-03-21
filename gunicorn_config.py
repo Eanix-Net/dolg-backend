@@ -7,13 +7,13 @@ import multiprocessing
 bind = "0.0.0.0:5000"
 
 # Number of worker processes for handling requests
-workers = multiprocessing.cpu_count() * 2 + 1
+workers = multiprocessing.cpu_count() + 1
 
 # Set worker class to sync to prevent possible timing-based request smuggling
 worker_class = "sync"
 
 # Set maximum requests per worker to prevent memory leaks
-max_requests = 1000
+max_requests = 100
 max_requests_jitter = 50
 
 # Enable HTTP response keep-alive to properly handle connections

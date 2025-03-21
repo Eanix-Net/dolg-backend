@@ -17,6 +17,7 @@ from blueprints.photos import photos_bp
 from blueprints.timelogs import timelogs_bp
 from blueprints.customer_portal import customer_portal_bp
 from blueprints.integrations import integrations_bp
+from blueprints.payments import payments_bp
 from flask import jsonify
 import os
 from dotenv import load_dotenv
@@ -94,6 +95,7 @@ def create_app():
     app.register_blueprint(timelogs_bp, url_prefix='/api/timelogs')
     app.register_blueprint(customer_portal_bp, url_prefix='/api/customer_portal')
     app.register_blueprint(integrations_bp, url_prefix='/api/integrations')
+    app.register_blueprint(payments_bp, url_prefix='/api/payments')
     
     # Create database tables (for development; use migrations in production)
     with app.app_context():

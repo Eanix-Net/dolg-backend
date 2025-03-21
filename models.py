@@ -85,6 +85,15 @@ class Invoice(db.Model):
     due_date = db.Column(db.Date, nullable=False)
     created_date = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     items = db.relationship('InvoiceItem', backref='invoice', lazy=True)
+    # Add fields needed for frontend functionality
+    amount_paid = db.Column(db.Float, default=0.0)
+    balance = db.Column(db.Float, default=0.0)
+    status = db.Column(db.String(32), default='draft')  # 'draft', 'sent', 'paid', 'overdue', 'canceled'
+    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
+    customer_name = db.Column(db.String(128))
+    invoice_number = db.Column(db.String(64), unique=True)
+    notes = db.Column(db.Text)
+    payments = db.relationship('Payment', backref='invoice', lazy=True)
 
 class InvoiceItem(db.Model):
     __tablename__ = 'invoice_items'
@@ -184,3 +193,17 @@ class TimeLog(db.Model):
     time_in = db.Column(db.DateTime, nullable=False)
     time_out = db.Column(db.DateTime, nullable=True)
     total_time = db.Column(db.Float)  # e.g., total hours
+
+# Add Payment model
+class Payment(db.Model):
+    __tablename__ = 'payments'
+    id = db.Column(db.Integer, primary_key=True)
+    invoice_id = db.Column(db.Integer, db.ForeignKey('invoices.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    payment_date = db.Column(db.DateTime, nullable=False)
+    payment_method = db.Column(db.String(32), nullable=False)  # 'cash', 'check', 'creditCard', 'debit', 'bankTransfer', 'other'
+    status = db.Column(db.String(32), default='completed')  # 'pending', 'completed', 'failed', 'refunded'
+    reference_number = db.Column(db.String(64))
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, onupdate=datetime.datetime.utcnow)
